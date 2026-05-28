@@ -2015,6 +2015,16 @@ function cancelGroupReply(){groupReplyToId=null;document.getElementById('group-r
 async function showGroupMembers(){if(!selectedGroupId)return;const r=await apiFetch(`/api/groups/${selectedGroupId}/members`);if(!r.ok)return;const members=await r.json();document.getElementById('mini-title').textContent='👥 Membres';document.getElementById('mini-desc').innerHTML=`<div style="max-height:400px;overflow-y:auto">${members.map(m=>`<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border)"><span class="status-dot ${m.online?'on':'off'}"></span><div style="flex:1;font-size:12px;font-weight:700">${esc(m.display_name)}${m.role==='admin'?' 👑':m.role==='moderator'?' 🛡':''}</div><button class="btn-sm" onclick="closeMini();openChat('${String(m.id||m.uid||'')}')" style="font-size:9px;padding:3px 6px">💬</button></div>`).join('')}</div>`;document.getElementById('mini-input').style.display='none';document.getElementById('mini-confirm').style.display='none';document.getElementById('mini-modal').classList.add('open')}
 
 // ══ CALLS (WEBRTC + FIREBASE SIGNALING) ══
+function rtcSessionToPlain(desc){
+  if(!desc)return null;
+  if(typeof desc.toJSON==='function')return desc.toJSON();
+  return {type:String(desc.type||''),sdp:String(desc.sdp||'')};
+}
+function rtcCandidateToPlain(c){
+  if(!c)return null;
+  if(typeof c.toJSON==='function')return c.toJSON();
+  return{candidate:c.candidate??'',sdpMid:c.sdpMid??null,sdpMLineIndex:c.sdpMLineIndex??null};
+}
 function getCallRoomId(uidA,uidB){return [String(uidA||''),String(uidB||'')].sort().join('__')}
 function setCallStatusLabel(text){const el=document.getElementById('ongoing-call-status');if(el)el.textContent=text||'Appel'}
 function setCallModals(incoming=false,ongoing=false){
@@ -2128,7 +2138,7 @@ async function createCallPeer(role){
   };
   peer.onicecandidate=(event)=>{
     if(!event.candidate||!callRoomId)return;
-    fb.push(fb.ref(fb.db,`calls/${callRoomId}/candidates/${currentUser.id}`),event.candidate.toJSON()).catch(()=>{});
+    fb.push(fb.ref(fb.db,`calls/${callRoomId}/candidates/${currentUser.id}`),rtcCandidateToPlain(event.candidate)).catch(()=>{});
   };
 }
 async function startVoiceCall(){
@@ -2152,7 +2162,7 @@ async function startVoiceCall(){
       callee_id:callTargetId,
       status:'ringing',
       created_at:Date.now(),
-      offer:offer.toJSON()
+      offer:rtcSessionToPlain(offer)
     });
     attachCallSignalingListeners('caller');
     updateCallButtonState();
@@ -2179,7 +2189,7 @@ async function acceptIncomingCall(){
     if(callIncomingData.offer)await callPeer.setRemoteDescription(new RTCSessionDescription(callIncomingData.offer));
     const answer=await callPeer.createAnswer();
     await callPeer.setLocalDescription(answer);
-    await fb.update(fb.ref(fb.db,`calls/${callRoomId}`),{answer:answer.toJSON(),status:'active',accepted_at:Date.now()});
+    await fb.update(fb.ref(fb.db,`calls/${callRoomId}`),{answer:rtcSessionToPlain(answer),status:'active',accepted_at:Date.now()});
     updateCallButtonState();
   }catch(err){
     console.error('acceptIncomingCall error:',err);
