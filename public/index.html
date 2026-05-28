@@ -157,8 +157,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 .btn-my-profile .my-avatar{width:28px;height:28px;border-radius:7px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;background:linear-gradient(135deg,rgba(0,212,255,.3),rgba(192,64,255,.3));color:#00d4ff}
 .btn-my-profile img{width:100%;height:100%;object-fit:cover}.btn-my-profile .my-name{font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .sidebar-footer{padding:6px 10px;border-top:1px solid var(--border);font-family:var(--mono);font-size:9px;color:var(--muted);text-align:center;flex-shrink:0}#online-count{color:#00d4ff}
-.chat-zone{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;background:var(--bg)}
-.chat-empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--muted)}.chat-empty-icon{font-size:40px;opacity:.25}.chat-empty p{font-size:13px;text-align:center;line-height:1.5}
+.chat-zone{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;background:var(--bg);position:relative}
+.chat-empty{flex:1;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--muted)}.chat-empty.visible{display:flex}.chat-empty-icon{font-size:40px;opacity:.25}.chat-empty p{font-size:13px;text-align:center;line-height:1.5}
+.chat-panel{display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;width:100%}.chat-panel.active{display:flex}
 .chat-header{display:flex;align-items:center;gap:8px;padding:0 12px;min-height:var(--chat-header-h);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;position:relative;z-index:26}
 .chat-header-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;overflow:hidden}
 .chat-header-avatar{flex-shrink:0;position:relative;cursor:pointer}
@@ -254,7 +255,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 .chat-input-area{padding:8px 10px;padding-bottom:calc(8px + var(--safe-bot))}
 .auth-card{border-radius:0;border:none;min-height:100%;padding:36px 22px;box-shadow:none}#auth-screen{padding:0;align-items:flex-start}
 .app-header{height:52px;padding:0 12px}
-#chat-active,#group-chat-active{display:flex!important;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.chat-zone.visible-mobile{display:flex;flex-direction:column}
 }
 #admin-panel{position:fixed;inset:0;z-index:100;display:none}#admin-panel.open{display:flex}
 .admin-overlay{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
@@ -459,7 +460,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 <div class="chat-zone" id="chat-zone">
 <div class="chat-empty" id="chat-empty"><div class="chat-empty-icon">💬</div><p>Sélectionne un membre<br/>pour démarrer une conversation</p></div>
 
-<div id="chat-active" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+<div id="chat-active" class="chat-panel">
 <div class="chat-header">
 <button type="button" class="chat-back-btn" onclick="goBackToList()" aria-label="Retour">‹</button>
 <div class="chat-header-main">
@@ -492,7 +493,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);display:flex
 </div>
 </div>
 
-<div id="group-chat-active" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+<div id="group-chat-active" class="chat-panel">
 <div class="chat-header">
 <button type="button" class="chat-back-btn" onclick="goBackToList()" aria-label="Retour">‹</button>
 <div class="chat-header-main">
@@ -1498,7 +1499,7 @@ function initFirebaseRealtime(){
     });
   })();
 }
-function enterApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('app').classList.add('visible');updateSlideMenu();if(FIREBASE_AUTH_MODE){initFirebaseRealtime();loadUsers();loadGroups();if(!selectedGroupId){setTimeout(()=>openGroupChat('general'),150)}}else{initSocket();loadUsers()}checkIOSInstall();updateMyProfileBtn();setTimeout(setupPushNotifications,3000);}
+function enterApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('app').classList.add('visible');updateSlideMenu();if(FIREBASE_AUTH_MODE){initFirebaseRealtime();loadUsers();loadGroups();if(!selectedGroupId&&!selectedUserId){if(isMobile())setChatView('empty');else setTimeout(()=>openGroupChat('general'),150)}}else{initSocket();loadUsers();if(isMobile())setChatView('empty')}checkIOSInstall();updateMyProfileBtn();setTimeout(setupPushNotifications,3000);}
 async function checkSession(){
   if(FIREBASE_AUTH_MODE){
     try{
@@ -1696,16 +1697,23 @@ async function loadGroups(){
     if(currentSidebarTab==='groups')renderSidebarContent();
   }catch(_){}
 }
-function showChatEmptyState(){document.getElementById('chat-empty').style.display='flex';document.getElementById('chat-active').style.display='none';document.getElementById('group-chat-active').style.display='none'}
+function setChatView(mode){
+  const empty=document.getElementById('chat-empty');
+  const dm=document.getElementById('chat-active');
+  const grp=document.getElementById('group-chat-active');
+  empty?.classList.toggle('visible',mode==='empty');
+  dm?.classList.toggle('active',mode==='dm');
+  grp?.classList.toggle('active',mode==='group');
+}
+function showChatEmptyState(){setChatView('empty')}
 function setMobileChatMode(on){document.getElementById('app')?.classList.toggle('mobile-chat-open',!!on&&isMobile())}
-function goBackToList(){document.getElementById('sidebar').classList.remove('hidden-mobile');document.getElementById('chat-zone').classList.remove('visible-mobile');setMobileChatMode(false);selectedUserId=null;selectedGroupId=null;closeContextMenu();closeChatDotsMenu();updateCallButtonState();applyMobileViewportFix()}
+function goBackToList(){document.getElementById('sidebar').classList.remove('hidden-mobile');document.getElementById('chat-zone').classList.remove('visible-mobile');setMobileChatMode(false);selectedUserId=null;selectedGroupId=null;setChatView('empty');closeContextMenu();closeChatDotsMenu();updateCallButtonState();applyMobileViewportFix()}
 
 // ══ DM CHAT ══
 async function openChat(userId){
   selectedUserId=userId;selectedGroupId=null;const user=allUsers.find(u=>u.id===userId);if(!user)return;
   user.unread=0;renderSidebarContent();unreadCount=0;clearInterval(titleTimer);document.title='XyGo';
-  document.getElementById('chat-empty').style.display='none';document.getElementById('group-chat-active').style.display='none';
-  const ca=document.getElementById('chat-active');ca.style.cssText='display:flex;flex-direction:column;flex:1;overflow:hidden';
+  setChatView('dm');
   updateChatHeader();await loadMessages(userId);cancelReply();closeSearchConv();closeChatDotsMenu();
   document.getElementById('typing-indicator').classList.remove('show');
   const pb=document.getElementById('cdm-pin-label');if(pb)pb.textContent=user.pinned?'Désépingler':'Épingler';
@@ -2037,7 +2045,7 @@ function closePublicProfile(){document.getElementById('public-profile-modal').cl
 function showCreateGroupModal(){closeMini();document.getElementById('mini-title').textContent='👥 Créer un groupe';document.getElementById('mini-desc').innerHTML=`<input class="mini-input" id="new-group-name" placeholder="Nom du groupe…" maxlength="40" style="display:block;margin-bottom:8px"/><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">Membres :</div><div id="gcm-cb" style="max-height:200px;overflow-y:auto;margin-bottom:8px">${allUsers.map(u=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;font-size:12px"><input type="checkbox" value="${u.id}" style="accent-color:var(--accent)"/> ${esc(u.display_name)}</label>`).join('')}</div>`;document.getElementById('mini-input').style.display='none';const c=document.getElementById('mini-confirm');c.textContent='👥 Créer';c.className='btn-action btn-success';c.style.display='';c.onclick=createGroup;document.getElementById('mini-modal').classList.add('open')}
 async function createGroup(){const name=document.getElementById('new-group-name')?.value?.trim();if(!name)return showToast('Nom requis','warn');const members=Array.from(document.querySelectorAll('#gcm-cb input:checked')).map(cb=>String(cb.value));const r=await apiFetch('/api/groups',{method:'POST',body:JSON.stringify({name,members})});if(r.ok){const d=await r.json();showToast('👥 Groupe créé !');closeMini();loadGroups();openGroupChat(String(d.groupId||d.id||d.group_uid||''))}else{const d=await r.json();showToast(d.error,'danger')}}
 async function leaveGroup(gid){await apiFetch(`/api/groups/${gid}/leave`,{method:'POST'});showToast('Groupe quitté');loadGroups();if(selectedGroupId===gid){selectedGroupId=null;showChatEmptyState()}}
-async function openGroupChat(groupId){selectedGroupId=String(groupId);selectedUserId=null;await loadGroups();const g=allGroups.find(x=>String(x.id)===String(groupId));if(!g)return showToast('Introuvable','danger');document.getElementById('chat-empty').style.display='none';document.getElementById('chat-active').style.display='none';const ga=document.getElementById('group-chat-active');ga.style.cssText='display:flex;flex-direction:column;flex:1;overflow:hidden';const iconEl=document.getElementById('group-chat-icon');if(iconEl)iconEl.textContent=g.is_public?'🌐':'👥';document.getElementById('group-chat-name').textContent=g.name||'Groupe';const gm=document.getElementById('group-chat-meta');if(gm){gm.textContent=g.is_public?'Salon public':'';gm.style.display=g.is_public?'block':'none'}document.getElementById('group-chat-members-count').textContent=`${g.member_count||0} membres`;document.getElementById('group-typing-indicator').classList.remove('show');renderSidebarContent();updateCallButtonState();await loadGroupMessages(String(g.id));cancelGroupReply();if(isMobile()){document.getElementById('sidebar').classList.add('hidden-mobile');document.getElementById('chat-zone').classList.add('visible-mobile');setMobileChatMode(true);applyMobileViewportFix()}setTimeout(()=>document.getElementById('group-chat-input').focus(),300)}
+async function openGroupChat(groupId){selectedGroupId=String(groupId);selectedUserId=null;await loadGroups();const g=allGroups.find(x=>String(x.id)===String(groupId));if(!g)return showToast('Introuvable','danger');setChatView('group');const iconEl=document.getElementById('group-chat-icon');if(iconEl)iconEl.textContent=g.is_public?'🌐':'👥';document.getElementById('group-chat-name').textContent=g.name||'Groupe';const gm=document.getElementById('group-chat-meta');if(gm){gm.textContent=g.is_public?'Salon public':'';gm.style.display=g.is_public?'block':'none'}document.getElementById('group-chat-members-count').textContent=`${g.member_count||0} membres`;document.getElementById('group-typing-indicator').classList.remove('show');renderSidebarContent();updateCallButtonState();await loadGroupMessages(String(g.id));cancelGroupReply();if(isMobile()){document.getElementById('sidebar').classList.add('hidden-mobile');document.getElementById('chat-zone').classList.add('visible-mobile');setMobileChatMode(true);applyMobileViewportFix()}setTimeout(()=>document.getElementById('group-chat-input').focus(),300)}
 async function loadGroupMessages(groupId){if(FIREBASE_AUTH_MODE){const fb=window.xygoFirebase;if(!fb)return;const area=document.getElementById('group-messages-area');area.innerHTML='<div style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);margin:auto">Début du groupe 👥</div>';if(firebaseGroupMessagesUnsub){firebaseGroupMessagesUnsub();firebaseGroupMessagesUnsub=null}firebaseGroupMessagesUnsub=fb.onChildAdded(fb.query(fb.ref(fb.db,`groupMessages/${groupId}`),fb.limitToLast(200)),(snap)=>{const ph=area.querySelector('[style*="margin:auto"]');if(ph)ph.remove();appendGroupMessage({id:snap.key,...(snap.val()||{})},false);scrollGroupToBottom()});return}const r=await apiFetch(`/api/groups/${groupId}/messages`);if(!r.ok)return;const msgs=await r.json();const area=document.getElementById('group-messages-area');area.innerHTML='';if(!msgs.length){area.innerHTML='<div style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);margin:auto">Début du groupe 👥</div>';return}let lastDay=null;msgs.forEach(m=>{const day=m.created_at.split(' ')[0];if(day!==lastDay){area.insertAdjacentHTML('beforeend',`<div class="day-sep"><span>${formatDay(day)}</span></div>`);lastDay=day}appendGroupMessage(m,false)});scrollGroupToBottom()}
 function appendGroupMessage(msg,animate=true){const area=document.getElementById('group-messages-area');const isMine=msg.sender_id===currentUser.id;const time=fmtTime(msg.created_at);const ph=area.querySelector('[style*="margin:auto"]');if(ph)ph.remove();const ch=msg.deleted?'[Message supprimé]':sanitizeContent(msg.content);const eb=msg.edited&&!msg.deleted?'<span class="msg-edited">modifié</span>':'';const rh=msg.reply_to&&msg.reply_sender_name&&!msg.deleted?`<div class="reply-preview"><div class="reply-preview-name">${esc(msg.reply_sender_name)}</div><div class="reply-preview-text">${esc((msg.reply_content||'[supprimé]').substring(0,80))}</div></div>`:'';const sl=!isMine&&!msg.deleted?`<div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-bottom:2px;font-weight:700">${esc(msg.sender_name)}</div>`:'';const row=document.createElement('div');row.className=`msg-row ${isMine?'mine':'theirs'}`;row.dataset.msgId=`g${msg.id}`;row.innerHTML=`<div class="message"><div class="msg-wrap"><div class="msg-bubble${msg.deleted?' msg-deleted':''}">${sl}${rh}${ch}${eb}</div></div><div class="msg-time">${time}</div></div>`;if(!animate){const b=row.querySelector('.msg-bubble');if(b)b.style.animation='none'}let lpT=null;const bubble=row.querySelector('.msg-bubble');if(bubble&&!msg.deleted){bubble.addEventListener('touchstart',()=>{lpT=setTimeout(()=>{setGroupReply(msg.id,isMine?currentUser.display_name:(msg.sender_name||''),msg.content?.substring(0,80)||'')},500)},{passive:true});bubble.addEventListener('touchend',()=>clearTimeout(lpT),{passive:true});bubble.addEventListener('touchmove',()=>clearTimeout(lpT),{passive:true})}area.appendChild(row)}
 async function sendGroupMessage(){const inp=document.getElementById('group-chat-input');const c=inp.value.trim();if(!c||!selectedGroupId)return;if(FIREBASE_AUTH_MODE){const fb=window.xygoFirebase;if(!fb||!currentUser)return;await fb.push(fb.ref(fb.db,`groupMessages/${selectedGroupId}`),{groupId:selectedGroupId,sender_id:currentUser.id,sender_name:currentUser.display_name||'Utilisateur',content:c,reply_to:groupReplyToId||null,created_at:Date.now(),deleted:false,edited:false});try{const r=await apiFetch(`/api/groups/${selectedGroupId}/members`);if(r.ok){const members=await r.json();const targets=(members||[]).map(m=>String(m.uid||m.id||'')).filter(id=>id&&id!==String(currentUser.id));sendPushToUsers(targets,`Groupe ${allGroups.find(g=>String(g.id)===String(selectedGroupId))?.name||'XyGo'}`,c.substring(0,90),{type:'group',id:String(selectedGroupId)});}}catch(_){}inp.value='';autoResize(inp);inp.focus();cancelGroupReply();return}if(!socket)return;socket.emit('group:message',{groupId:selectedGroupId,content:c,replyTo:groupReplyToId});inp.value='';autoResize(inp);inp.focus();cancelGroupReply();socket.emit('group:typing:stop',{groupId:selectedGroupId})}
