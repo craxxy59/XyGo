@@ -2071,42 +2071,65 @@ function cleanupCallState(silent=false){
   updateCallButtonState();
   if(!silent)showToast('📴 Appel terminé');
 }
+function attachCallSignalingListeners(role){
+  const fb=window.xygoFirebase;
+  if(!fb||!callRoomId||!callTargetId)return;
+  closeCallRoomListeners();
+  callCandidatesUnsub=fb.onChildAdded(fb.ref(fb.db,`calls/${callRoomId}/candidates/${callTargetId}`),async(snap)=>{
+    const data=snap.val();
+    const peer=callPeer;
+    if(!data||!peer||peer.signalingState==='closed')return;
+    try{await peer.addIceCandidate(new RTCIceCandidate(data))}catch(_){}
+  });
+  callRoomUnsub=fb.onValue(fb.ref(fb.db,`calls/${callRoomId}`),async(snap)=>{
+    const peer=callPeer;
+    if(!peer||peer.signalingState==='closed')return;
+    if(!snap.exists()){
+      if(callState==='dialing'||callState==='connecting')return;
+      if(callState!=='idle')cleanupCallState(true);
+      return;
+    }
+    const call=snap.val()||{};
+    if(call.status==='ended'||call.status==='rejected'){
+      if(callState!=='idle'){
+        showToast(call.status==='rejected'?'📵 Appel refusé':'📴 Appel terminé');
+        cleanupCallState(true);
+      }
+      return;
+    }
+    if(role==='caller'&&call.answer&&peer.signalingState!=='closed'&&!peer.currentRemoteDescription){
+      try{
+        await peer.setRemoteDescription(new RTCSessionDescription(call.answer));
+        setCallStatusLabel('En communication');
+      }catch(_){}
+    }
+  });
+}
 async function createCallPeer(role){
   const fb=window.xygoFirebase;
   if(!fb||!currentUser||!callRoomId||!callTargetId)throw new Error('Contexte appel invalide');
-  callPeer=new RTCPeerConnection(CALL_STUN);
+  if(role==='caller'){
+    try{await fb.remove(fb.ref(fb.db,`calls/${callRoomId}`))}catch(_){}
+  }
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+  const peer=new RTCPeerConnection(CALL_STUN);
+  callPeer=peer;
+  callLocalStream=stream;
+  stream.getTracks().forEach((track)=>peer.addTrack(track,stream));
   callRemoteStream=new MediaStream();
   const remoteAudio=document.getElementById('remote-call-audio');
   if(remoteAudio)remoteAudio.srcObject=callRemoteStream;
-  callPeer.ontrack=(event)=>{
-    event.streams[0]?.getTracks()?.forEach((track)=>callRemoteStream.addTrack(track));
+  peer.ontrack=(event)=>{
+    event.streams[0]?.getTracks()?.forEach((track)=>{
+      if(callRemoteStream)callRemoteStream.addTrack(track);
+    });
     callState='active';
     setCallStatusLabel('En communication');
   };
-  callPeer.onicecandidate=(event)=>{
-    if(!event.candidate)return;
+  peer.onicecandidate=(event)=>{
+    if(!event.candidate||!callRoomId)return;
     fb.push(fb.ref(fb.db,`calls/${callRoomId}/candidates/${currentUser.id}`),event.candidate.toJSON()).catch(()=>{});
   };
-  callCandidatesUnsub=fb.onChildAdded(fb.ref(fb.db,`calls/${callRoomId}/candidates/${callTargetId}`),async(snap)=>{
-    const data=snap.val();
-    if(!data||!callPeer)return;
-    try{await callPeer.addIceCandidate(new RTCIceCandidate(data))}catch(_){}
-  });
-  callRoomUnsub=fb.onValue(fb.ref(fb.db,`calls/${callRoomId}`),async(snap)=>{
-    if(!snap.exists()){cleanupCallState();return}
-    const call=snap.val()||{};
-    if(call.status==='ended'||call.status==='rejected'){
-      if(callState!=='idle'){showToast(call.status==='rejected'?'📵 Appel refusé':'📴 Appel terminé')}
-      cleanupCallState(true);
-      return;
-    }
-    if(role==='caller'&&call.answer&&callPeer.signalingState!=='closed'&&!callPeer.currentRemoteDescription){
-      try{await callPeer.setRemoteDescription(new RTCSessionDescription(call.answer));setCallStatusLabel('En communication')}catch(_){}
-    }
-  });
-  const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-  callLocalStream=stream;
-  stream.getTracks().forEach((track)=>callPeer.addTrack(track,stream));
 }
 async function startVoiceCall(){
   if(callState!=='idle')return showToast('Un appel est déjà en cours','warn');
@@ -2131,6 +2154,7 @@ async function startVoiceCall(){
       created_at:Date.now(),
       offer:offer.toJSON()
     });
+    attachCallSignalingListeners('caller');
     updateCallButtonState();
   }catch(err){
     console.error('startVoiceCall error:',err);
@@ -2150,6 +2174,7 @@ async function acceptIncomingCall(){
     callRoomId=String(callIncomingData.id);
     callTargetId=String(callIncomingData.caller_id);
     showOngoingCallModal(getCallTargetName(callTargetId),'Connexion...');
+    attachCallSignalingListeners('callee');
     await createCallPeer('callee');
     if(callIncomingData.offer)await callPeer.setRemoteDescription(new RTCSessionDescription(callIncomingData.offer));
     const answer=await callPeer.createAnswer();
