@@ -656,6 +656,7 @@ let callRoomUnsub=null;
 let callCandidatesUnsub=null;
 let firebaseIncomingCallUnsub=null;
 let callMuted=false;
+let callRingTimer=null;
 const CALL_STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
 function loadCloudinaryConfig(){
   const hardcodedCloud='dp4hm4duv';
@@ -1447,14 +1448,27 @@ function initFirebaseRealtime(){
     updateSlideMenu();
     updateMyProfileBtn();
   });
-  firebaseIncomingCallUnsub=fb.onChildAdded(fb.query(fb.ref(fb.db,'calls'),fb.orderByChild('callee_id'),fb.equalTo(currentUser.id),fb.limitToLast(3)),(snap)=>{
-    const call=snap.val()||{};
-    if(!snap.key||call.caller_id===currentUser.id)return;
-    if(call.status!=='ringing')return;
-    if(callState!=='idle')return;
-    callIncomingData={id:snap.key,...call};
-    showIncomingCallModal(callIncomingData);
-  });
+  (async()=>{
+    try{
+      const snap=await fb.get(fb.query(fb.ref(fb.db,'calls'),fb.orderByChild('callee_id'),fb.equalTo(currentUser.id),fb.limitToLast(5)));
+      if(snap.exists()){
+        snap.forEach((c)=>{
+          const key=String(c.key||'');
+          const v=c.val()||{};
+          const age=Date.now()-(v.created_at||0);
+          if(v.status==='ringing'&&String(v.caller_id||'')!==String(currentUser.id)&&age<60000){
+            notifyIncomingCall({id:key,...v});
+          }
+          firebaseNotifSeenKeys.add(`call:${key}`);
+        });
+      }
+    }catch(_){}
+    firebaseIncomingCallUnsub=fb.onChildAdded(fb.query(fb.ref(fb.db,'calls'),fb.orderByChild('callee_id'),fb.equalTo(currentUser.id),fb.limitToLast(5)),(snap)=>{
+      const key=String(snap.key||'');
+      if(!key)return;
+      notifyIncomingCall({id:key,...(snap.val()||{})});
+    });
+  })();
 }
 function enterApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('app').classList.add('visible');updateSlideMenu();if(FIREBASE_AUTH_MODE){initFirebaseRealtime();loadUsers();loadGroups();if(!selectedGroupId){setTimeout(()=>openGroupChat('general'),150)}}else{initSocket();loadUsers()}checkIOSInstall();updateMyProfileBtn();setTimeout(setupPushNotifications,3000);}
 async function checkSession(){
@@ -2079,6 +2093,9 @@ function cleanupCallState(silent=false){
   if(muteBtn)muteBtn.textContent='Micro';
   setCallModals(false,false);
   updateCallButtonState();
+  stopCallRing();
+  hideNotifBar();
+  resetCallTabTitle();
   if(!silent)showToast('📴 Appel terminé');
 }
 function attachCallSignalingListeners(role){
@@ -2165,6 +2182,12 @@ async function startVoiceCall(){
       offer:rtcSessionToPlain(offer)
     });
     attachCallSignalingListeners('caller');
+    sendPushToUsers(
+      [callTargetId],
+      `📞 ${currentUser.display_name||'XyGo'}`,
+      'Appel vocal entrant',
+      {type:'call',id:String(currentUser.id),roomId:callRoomId}
+    );
     updateCallButtonState();
   }catch(err){
     console.error('startVoiceCall error:',err);
@@ -2173,6 +2196,9 @@ async function startVoiceCall(){
   }
 }
 async function acceptIncomingCall(){
+  stopCallRing();
+  hideNotifBar();
+  resetCallTabTitle();
   if(!callIncomingData||callState!=='idle')return;
   if(location.protocol!=='https:'&&location.hostname!=='localhost')return showToast("Appel bloque: HTTPS requis",'danger');
   if(!navigator.mediaDevices?.getUserMedia)return showToast('Appel non supporté','danger');
@@ -2198,6 +2224,9 @@ async function acceptIncomingCall(){
   }
 }
 async function rejectIncomingCall(){
+  stopCallRing();
+  hideNotifBar();
+  resetCallTabTitle();
   if(!callIncomingData)return;
   const fb=window.xygoFirebase;
   try{
@@ -2237,6 +2266,108 @@ function getCallErrorMessage(err){
 
 // ══ NOTIFICATIONS ══
 let notifTimer=null,notifTarget=null;
+function hideNotifBar(){
+  document.getElementById('msg-notif')?.classList.remove('show');
+  clearTimeout(notifTimer);
+}
+function stopCallRing(){
+  if(callRingTimer){clearInterval(callRingTimer);callRingTimer=null}
+}
+function playCallRingSound(){
+  stopCallRing();
+  const chime=()=>{
+    try{
+      const ctx=new(window.AudioContext||window.webkitAudioContext)();
+      const o1=ctx.createOscillator();
+      const o2=ctx.createOscillator();
+      const g=ctx.createGain();
+      o1.connect(g);o2.connect(g);g.connect(ctx.destination);
+      o1.frequency.setValueAtTime(523,ctx.currentTime);
+      o2.frequency.setValueAtTime(659,ctx.currentTime);
+      g.gain.setValueAtTime(0,ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.18,ctx.currentTime+0.03);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.55);
+      o1.start(ctx.currentTime);o2.start(ctx.currentTime);
+      o1.stop(ctx.currentTime+0.55);o2.stop(ctx.currentTime+0.55);
+    }catch(_){}
+  };
+  chime();
+  callRingTimer=setInterval(chime,2200);
+}
+function updateTabTitleForCall(){
+  clearInterval(titleTimer);
+  titleTimer=setInterval(()=>{
+    document.title=document.title==='📞 Appel entrant'?'XyGo':'📞 Appel entrant';
+  },700);
+}
+function resetCallTabTitle(){
+  if(unreadCount>0)return;
+  clearInterval(titleTimer);
+  document.title='XyGo';
+}
+async function notifyIncomingCall(call){
+  const roomId=String(call.id||'');
+  const callerId=String(call.caller_id||'');
+  if(!roomId||!callerId||callerId===String(currentUser?.id))return;
+  if(call.status&&call.status!=='ringing')return;
+  if(callState!=='idle')return;
+  const dedupe=`call:${roomId}`;
+  if(firebaseNotifSeenKeys.has(dedupe))return;
+  firebaseNotifSeenKeys.add(dedupe);
+  callIncomingData={id:roomId,caller_id:callerId,...call};
+  const name=getCallTargetName(callerId);
+  showIncomingCallModal(callIncomingData);
+  showCallNotif(name,callerId,roomId);
+  playCallRingSound();
+  updateTabTitleForCall();
+  try{navigator.vibrate([280,120,280,120,280])}catch(_){}
+  await showSystemCallNotif(name,callerId,roomId);
+}
+function showCallNotif(from,fromId,roomId){
+  notifTarget={type:'call',id:String(fromId),roomId:String(roomId||'')};
+  document.getElementById('notif-avatar').textContent='📞';
+  document.getElementById('notif-name').textContent=from;
+  document.getElementById('notif-preview').textContent='Appel vocal — toucher pour répondre';
+  document.getElementById('notif-time').textContent=fmtTime(new Date());
+  const n=document.getElementById('msg-notif');
+  n.classList.add('show');
+  clearTimeout(notifTimer);
+  notifTimer=setTimeout(()=>hideNotifBar(),15000);
+}
+async function showSystemCallNotif(from,fromId,roomId){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const targetInfo={type:'call',id:String(fromId),roomId:String(roomId||'')};
+  const title=`📞 ${from}`;
+  const body='Appel vocal entrant';
+  const opts={body,icon:'/icon-192.png',badge:'/icon-72.png',tag:`xygo-call-${roomId}`,renotify:true,requireInteraction:true,data:{targetInfo}};
+  try{
+    const reg=await navigator.serviceWorker?.ready;
+    if(reg?.showNotification)await reg.showNotification(title,{...opts,vibrate:[300,100,300,100,300]});
+    else{
+      const n=new Notification(title,opts);
+      n.onclick=()=>{window.focus();openNotifTarget()};
+      setTimeout(()=>n.close(),12000);
+    }
+  }catch(_){}
+}
+function openNotifTarget(){
+  hideNotifBar();
+  stopCallRing();
+  resetCallTabTitle();
+  const t=notifTarget;
+  if(!t)return;
+  if(t.type==='call'){
+    openChat(t.id);
+    if(callIncomingData)showIncomingCallModal(callIncomingData);
+    else if(t.roomId){
+      callIncomingData={id:t.roomId,caller_id:t.id,status:'ringing'};
+      showIncomingCallModal(callIncomingData);
+    }
+    return;
+  }
+  if(t.type==='group')openGroupChat(t.id);
+  else if(t.id)openChat(t.id);
+}
 async function enableNotificationsManual(){
   if(!('Notification' in window))return showToast('Notifications non supportées','danger');
   try{
@@ -2250,8 +2381,8 @@ async function enableNotificationsManual(){
   }catch(_){showToast('Erreur notifications','danger')}
 }
 function showMsgNotif(from,fromId,preview,targetInfo={type:'dm',id:fromId}){notifTarget=targetInfo;document.getElementById('notif-avatar').textContent=(from||'?')[0].toUpperCase();document.getElementById('notif-name').textContent=from;const pv=String(preview||'');const pt=(pv.startsWith('data:image/')||pv.startsWith('https://res.cloudinary.com/'))?'📷 Photo':pv.length>60?pv.substring(0,60)+'…':pv;document.getElementById('notif-preview').textContent=pt;document.getElementById('notif-time').textContent=fmtTime(new Date());const n=document.getElementById('msg-notif');n.classList.add('show');clearTimeout(notifTimer);notifTimer=setTimeout(()=>n.classList.remove('show'),5000);try{if(navigator.vibrate)navigator.vibrate([40,30,40])}catch(_){}if(document.hidden&&Notification.permission==='granted'){(async()=>{try{const reg=await navigator.serviceWorker?.ready;const data={targetInfo:{type:targetInfo?.type||'dm',id:String(targetInfo?.id||fromId)}};if(reg&&reg.showNotification){await reg.showNotification('XyGo — '+from,{body:pt,icon:'/icon-192.png',badge:'/icon-72.png',tag:`xygo-local-${data.targetInfo.type}-${data.targetInfo.id}`,renotify:true,data});return}}catch(_){}try{const notif=new Notification('XyGo — '+from,{body:pt,icon:'/icon-192.png',badge:'/icon-72.png',data:{targetInfo}});notif.onclick=()=>{window.focus();if(targetInfo?.type==='group')openGroupChat(targetInfo.id);else openChat(targetInfo?.id||fromId);notif.close()};setTimeout(()=>notif.close(),5000)}catch(_){}})();}}
-function closeNotif(e){e.stopPropagation();document.getElementById('msg-notif').classList.remove('show');clearTimeout(notifTimer)}
-function openChatFromNotif(){document.getElementById('msg-notif').classList.remove('show');if(notifTarget?.type==='group')openGroupChat(notifTarget.id);else if(notifTarget?.id)openChat(notifTarget.id)}
+function closeNotif(e){e.stopPropagation();hideNotifBar();if(notifTarget?.type==='call')stopCallRing()}
+function openChatFromNotif(){openNotifTarget()}
 function playNotifSound(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const o1=ctx.createOscillator(),o2=ctx.createOscillator(),g=ctx.createGain();o1.connect(g);o2.connect(g);g.connect(ctx.destination);o1.frequency.setValueAtTime(520,ctx.currentTime);o1.frequency.linearRampToValueAtTime(780,ctx.currentTime+0.1);o2.frequency.setValueAtTime(660,ctx.currentTime+0.08);o2.frequency.linearRampToValueAtTime(880,ctx.currentTime+0.18);g.gain.setValueAtTime(0,ctx.currentTime);g.gain.linearRampToValueAtTime(0.15,ctx.currentTime+0.02);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.3);o1.start(ctx.currentTime);o1.stop(ctx.currentTime+0.15);o2.start(ctx.currentTime+0.08);o2.stop(ctx.currentTime+0.3)}catch(_){}}
 let origTitle='XyGo',unreadCount=0,titleTimer=null;
 function updateTabTitle(delta){unreadCount=Math.max(0,unreadCount+delta);if(unreadCount>0){document.title=`(${unreadCount}) XyGo`;clearInterval(titleTimer);titleTimer=setInterval(()=>{document.title=document.title===`(${unreadCount}) XyGo`?'💬 XyGo':`(${unreadCount}) XyGo`},1200)}else{clearInterval(titleTimer);document.title='XyGo'}}
@@ -2271,7 +2402,13 @@ function isIOS(){return/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MS
 function isInStandaloneMode(){return window.navigator.standalone||window.matchMedia('(display-mode: standalone)').matches}
 function checkIOSInstall(){if(isIOS()&&!isInStandaloneMode()&&!localStorage.getItem('ios_hint_dismissed')){setTimeout(()=>{document.getElementById('ios-install-hint').classList.add('show');localStorage.setItem('ios_hint_dismissed','1')},5000)}}
 function showInstallBtn(){if(isInStandaloneMode())return;if(isIOS())document.getElementById('ios-install-hint').classList.add('show');else if(deferredPrompt)installPWA()}
-navigator.serviceWorker?.addEventListener('message',e=>{if(e.data?.type==='OPEN_CHAT'&&e.data.fromId)openChat(e.data.fromId);if(e.data?.type==='OPEN_TARGET'&&e.data.targetInfo){const t=e.data.targetInfo;if(t.type==='group')openGroupChat(t.id);else openChat(t.id)}});
+navigator.serviceWorker?.addEventListener('message',e=>{
+  if(e.data?.type==='OPEN_CHAT'&&e.data.fromId)openChat(e.data.fromId);
+  if(e.data?.type==='OPEN_TARGET'&&e.data.targetInfo){
+    notifTarget=e.data.targetInfo;
+    openNotifTarget();
+  }
+});
 
 // ══ THEME ══
 function applyTheme(theme){document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('xygo_theme',theme)}catch(_){}}
