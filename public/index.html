@@ -2111,6 +2111,7 @@ async function createCallPeer(role){
 async function startVoiceCall(){
   if(callState!=='idle')return showToast('Un appel est déjà en cours','warn');
   if(!selectedUserId||!currentUser)return showToast('Choisis un contact','warn');
+  if(location.protocol!=='https:'&&location.hostname!=='localhost')return showToast("Appel bloque: HTTPS requis",'danger');
   if(!navigator.mediaDevices?.getUserMedia)return showToast('Appel non supporté','danger');
   const fb=window.xygoFirebase;
   if(!fb)return;
@@ -2131,13 +2132,15 @@ async function startVoiceCall(){
       offer:offer.toJSON()
     });
     updateCallButtonState();
-  }catch(_){
+  }catch(err){
+    console.error('startVoiceCall error:',err);
     cleanupCallState(true);
-    showToast("Impossible de lancer l'appel",'danger');
+    showToast(`Impossible de lancer l'appel: ${getCallErrorMessage(err)}`,'danger');
   }
 }
 async function acceptIncomingCall(){
   if(!callIncomingData||callState!=='idle')return;
+  if(location.protocol!=='https:'&&location.hostname!=='localhost')return showToast("Appel bloque: HTTPS requis",'danger');
   if(!navigator.mediaDevices?.getUserMedia)return showToast('Appel non supporté','danger');
   const fb=window.xygoFirebase;
   if(!fb)return;
@@ -2153,9 +2156,10 @@ async function acceptIncomingCall(){
     await callPeer.setLocalDescription(answer);
     await fb.update(fb.ref(fb.db,`calls/${callRoomId}`),{answer:answer.toJSON(),status:'active',accepted_at:Date.now()});
     updateCallButtonState();
-  }catch(_){
+  }catch(err){
+    console.error('acceptIncomingCall error:',err);
     cleanupCallState(true);
-    showToast("Impossible d'accepter l'appel",'danger');
+    showToast(`Impossible d'accepter l'appel: ${getCallErrorMessage(err)}`,'danger');
   }
 }
 async function rejectIncomingCall(){
@@ -2181,6 +2185,19 @@ function toggleMuteCall(){
   callLocalStream.getAudioTracks().forEach((track)=>{track.enabled=!callMuted});
   const btn=document.getElementById('mute-call-btn');
   if(btn)btn.textContent=callMuted?'Micro off':'Micro';
+}
+function getCallErrorMessage(err){
+  const code=String(err?.code||'');
+  const name=String(err?.name||'');
+  const msg=String(err?.message||'');
+  if(name==='NotAllowedError'||code.includes('permission-denied'))return 'micro refuse ou acces Firebase refuse';
+  if(name==='NotFoundError')return 'aucun micro detecte';
+  if(name==='NotReadableError')return 'micro deja utilise par une autre app';
+  if(name==='SecurityError')return 'navigateur bloque en contexte non securise';
+  if(code.includes('PERMISSION_DENIED'))return 'regles Firebase bloquent l appel';
+  if(code.includes('NETWORK_ERROR'))return 'probleme reseau';
+  if(msg)return msg.slice(0,90);
+  return 'erreur inconnue';
 }
 
 // ══ NOTIFICATIONS ══
