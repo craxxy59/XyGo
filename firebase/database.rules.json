@@ -1,0 +1,86 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
+        "role": {
+          ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+        },
+        "permissions": {
+          ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+        },
+        "restrictions": {
+          ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+        },
+        "banned": {
+          ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator'"
+        },
+        "ban_reason": {
+          ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator'"
+        },
+        "banned_until": {
+          ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator'"
+        }
+      }
+    },
+    "rooms": {
+      "$roomId": {
+        "messages": {
+          "$msgId": {
+            ".read": "auth != null",
+            ".write": "auth != null && newData.child('sender_id').val() === auth.uid"
+          }
+        }
+      }
+    },
+    "dm": {
+      "$roomId": {
+        ".read": "auth != null && $roomId.matches('.*' + auth.uid + '.*')",
+        "messages": {
+          "$msgId": {
+            ".write": "auth != null && newData.child('sender_id').val() === auth.uid && $roomId.matches('.*' + auth.uid + '.*')"
+          }
+        }
+      }
+    },
+    "groups": {
+      "$groupId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "groupMembers": {
+      "$groupId": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator'"
+        }
+      }
+    },
+    "groupMessages": {
+      "$groupId": {
+        "$msgId": {
+          ".read": "auth != null",
+          ".write": "auth != null && (newData.child('sender_id').val() === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator')"
+        }
+      }
+    },
+    "notes": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator'"
+      }
+    },
+    "audit": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator')"
+    },
+    "announcements": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'moderator')"
+    }
+  }
+}

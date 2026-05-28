@@ -1,0 +1,12 @@
+{
+  "name": "xygo-firebase-tools",
+  "private": true,
+  "scripts": {
+    "migrate:dry": "node scripts/import-sqlite-to-rtdb.js --dry-run",
+    "migrate:apply": "node scripts/import-sqlite-to-rtdb.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "firebase-admin": "^13.6.0"
+  }
+}
