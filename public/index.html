@@ -159,6 +159,7 @@ body{font-family:var(--sans);background:linear-gradient(180deg,rgba(255,255,255,
 .chat-back-btn{display:none;width:32px;height:32px;border:1px solid var(--border);background:var(--surface2);border-radius:8px;color:var(--text);font-size:18px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
 .chat-header-info{flex:1;min-width:0}.chat-header-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chat-header-status{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:1px}
 .chat-dots-btn{width:32px;height:32px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}.chat-dots-btn:hover{border-color:var(--accent);color:var(--accent)}
+.chat-call-btn{width:32px;height:32px;background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:6px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}.chat-call-btn:hover{border-color:var(--accent);background:rgba(0,212,255,.08)}
 .chat-dots-menu{display:none;position:absolute;top:48px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;min-width:180px;box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:50;animation:ctxIn .2s cubic-bezier(.34,1.56,.64,1);overflow:hidden}.chat-dots-menu.open{display:block}
 .cdm-item{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:13px;color:var(--text);transition:background .1s}.cdm-item:hover{background:var(--surface2)}.cdm-item .cdm-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
 .messages-area{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:6px;background:transparent;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
@@ -291,6 +292,17 @@ body{font-family:var(--sans);background:linear-gradient(180deg,rgba(255,255,255,
 #toast.show{transform:translateY(0);opacity:1}#toast.warn-toast{border-color:var(--warn)}#toast.danger-toast{border-color:var(--danger)}#toast span{color:#00d4ff}
 #msg-notif{position:fixed;top:calc(16px + var(--safe-top));right:16px;left:16px;background:var(--surface);border:1px solid transparent;border-image:var(--grad) 1;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;z-index:9998;transform:translateY(-120%);opacity:0;transition:all .35s cubic-bezier(.34,1.56,.64,1);cursor:pointer;box-shadow:0 8px 32px rgba(0,0,0,.6);max-width:380px}
 @media(min-width:640px){#msg-notif{left:auto;width:340px}}#msg-notif.show{transform:translateY(0);opacity:1}
+.call-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
+.call-modal.open{display:flex}
+.call-card{width:min(360px,100%);background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.35)}
+.call-avatar{width:72px;height:72px;border-radius:18px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(0,212,255,.25),rgba(192,64,255,.25));font-size:24px;font-weight:700}
+.call-name{font-weight:700;font-size:16px}
+.call-status{font-family:var(--mono);font-size:11px;color:var(--muted);margin:6px 0 14px}
+.call-actions{display:flex;gap:10px;justify-content:center}
+.call-btn{border:none;border-radius:999px;padding:10px 14px;font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer}
+.call-btn.accept{background:rgba(0,245,160,.2);color:var(--accent);border:1px solid rgba(0,245,160,.4)}
+.call-btn.reject{background:rgba(255,64,96,.2);color:var(--danger);border:1px solid rgba(255,64,96,.4)}
+.call-btn.neutral{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
 .notif-avatar{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:var(--grad);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;text-transform:uppercase}
 .notif-body{flex:1;min-width:0}.notif-name{font-weight:700;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .notif-preview{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -436,6 +448,7 @@ body{font-family:var(--sans);background:linear-gradient(180deg,rgba(255,255,255,
 <button class="chat-back-btn" onclick="goBackToList()">‹</button>
 <div class="avatar" id="chat-avatar" onclick="openPublicProfileFromChat()" style="cursor:pointer"></div>
 <div class="chat-header-info"><div class="chat-header-name" id="chat-name"></div><div class="chat-header-status" id="chat-status"></div></div>
+<button class="chat-call-btn" id="chat-call-btn" onclick="startVoiceCall()" title="Appeler">📞</button>
 <button class="chat-dots-btn" onclick="toggleChatDotsMenu()">⋮</button>
 <div class="chat-dots-menu" id="chat-dots-menu">
 <div class="cdm-item" onclick="toggleSearchConv();closeChatDotsMenu()"><span class="cdm-icon">🔍</span>Rechercher</div>
@@ -512,6 +525,9 @@ body{font-family:var(--sans);background:linear-gradient(180deg,rgba(255,255,255,
 <div class="emoji-picker-full" id="emoji-picker-full"><div class="emoji-picker-full-overlay" onclick="closeFullEmojiPicker()"></div><div class="emoji-picker-full-card"><div class="emoji-picker-full-title">Réactions</div><div class="emoji-picker-full-grid" id="emoji-full-grid"></div></div></div>
 
 <div id="msg-notif" onclick="openChatFromNotif()"><div class="notif-avatar" id="notif-avatar">?</div><div class="notif-body"><div class="notif-name" id="notif-name"></div><div class="notif-preview" id="notif-preview"></div></div><div class="notif-time" id="notif-time"></div><button class="notif-close" onclick="closeNotif(event)">✕</button></div>
+<div class="call-modal" id="incoming-call-modal"><div class="call-card"><div class="call-avatar" id="incoming-call-avatar">?</div><div class="call-name" id="incoming-call-name">Appel entrant</div><div class="call-status">Quelqu'un essaie de vous joindre</div><div class="call-actions"><button class="call-btn reject" onclick="rejectIncomingCall()">Refuser</button><button class="call-btn accept" onclick="acceptIncomingCall()">Accepter</button></div></div></div>
+<div class="call-modal" id="ongoing-call-modal"><div class="call-card"><div class="call-avatar" id="ongoing-call-avatar">?</div><div class="call-name" id="ongoing-call-name">Appel audio</div><div class="call-status" id="ongoing-call-status">Connexion...</div><div class="call-actions"><button class="call-btn neutral" id="mute-call-btn" onclick="toggleMuteCall()">Micro</button><button class="call-btn reject" onclick="hangupCall()">Raccrocher</button></div></div></div>
+<audio id="remote-call-audio" autoplay playsinline></audio>
 
 <div id="pwa-install-banner"><div class="pwa-banner-top"><img src="/icon-192.png" class="pwa-banner-icon" alt="XyGo"/><div class="pwa-banner-info"><div class="pwa-banner-title">Installer XyGo</div><div class="pwa-banner-sub">Accès rapide</div></div><button class="pwa-banner-close" onclick="dismissPWA()">✕</button></div><div class="pwa-banner-btns"><button class="pwa-btn-install" onclick="installPWA()">📲 Installer</button><button class="pwa-btn-later" onclick="dismissPWA()">Plus tard</button></div></div>
 <div id="ios-install-hint"><div class="ios-hint-title">📲 Installer XyGo sur iPhone</div><div class="ios-hint-steps">1. Appuie sur <strong>⎙ Partager</strong><br/>2. Choisis <strong>"Sur l'écran d'accueil"</strong><br/>3. <strong>Ajouter</strong></div><button class="ios-hint-close" onclick="document.getElementById('ios-install-hint').classList.remove('show')">OK</button></div>
@@ -624,6 +640,19 @@ let firebaseGroupNotifBaselineByRoom={};
 let firebaseNotifSeenKeys=new Set();
 let CLOUDINARY_CLOUD_NAME='';
 let CLOUDINARY_UPLOAD_PRESET='';
+let callPeer=null;
+let callLocalStream=null;
+let callRemoteStream=null;
+let callRoomId=null;
+let callTargetId=null;
+let callDirection='';
+let callState='idle';
+let callIncomingData=null;
+let callRoomUnsub=null;
+let callCandidatesUnsub=null;
+let firebaseIncomingCallUnsub=null;
+let callMuted=false;
+const CALL_STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
 function loadCloudinaryConfig(){
   const hardcodedCloud='dp4hm4duv';
   const hardcodedPreset='xygo_unsigned';
@@ -1360,12 +1389,42 @@ async function syncFirebaseUserProfile(user,displayNameFallback=''){
 }
 async function doLogin(){const login=document.getElementById('login-id').value.trim(),password=document.getElementById('login-pass').value;if(!login||!password)return setError('Remplis tous les champs');if(!FIREBASE_AUTH_MODE){setError('Mode Firebase requis');return}try{const fb=window.xygoFirebase;if(!fb)return setError('Firebase non charge');const email=normalizeLoginToEmail(login);const cred=await fb.signInWithEmailAndPassword(fb.auth,email,password);await syncFirebaseUserProfile(cred.user);const role=isAdminIdentity(cred.user.email)?'admin':'member';currentUser={id:cred.user.uid,uid:cred.user.uid,display_name:cred.user.displayName||login,email:cred.user.email||'',role,permissions:[],restrictions:[]};enterApp()}catch(e){setError(firebaseErrorToFrench(e))}}
 async function doRegister(){const login=document.getElementById('reg-login').value.trim(),display_name=document.getElementById('reg-display').value.trim(),password=document.getElementById('reg-pass').value;if(!login||!display_name||!password)return setError('Remplis tous les champs');if(!FIREBASE_AUTH_MODE){setError('Mode Firebase requis');return}try{const fb=window.xygoFirebase;if(!fb)return setError('Firebase non charge');const email=normalizeLoginToEmail(login);const cred=await fb.createUserWithEmailAndPassword(fb.auth,email,password);await syncFirebaseUserProfile(cred.user,display_name);const role=isAdminIdentity(cred.user.email)?'admin':'member';currentUser={id:cred.user.uid,uid:cred.user.uid,display_name:display_name,email:cred.user.email||'',role,permissions:[],restrictions:[]};enterApp()}catch(e){setError(firebaseErrorToFrench(e))}}
-async function doLogout(){closeSlideMenu();if(FIREBASE_AUTH_MODE){try{const fb=window.xygoFirebase;if(fb?.auth?.currentUser){await fb.update(fb.ref(fb.db,`users/${fb.auth.currentUser.uid}`),{online:false,last_seen:Date.now()});await fb.signOut(fb.auth)}}catch(_){}}else{try{await apiFetch('/api/logout',{method:'POST'})}catch(_){}}if(firebaseUsersUnsub){firebaseUsersUnsub();firebaseUsersUnsub=null}if(firebaseMessagesUnsub){firebaseMessagesUnsub();firebaseMessagesUnsub=null}if(firebaseGroupMessagesUnsub){firebaseGroupMessagesUnsub();firebaseGroupMessagesUnsub=null}if(firebaseAnnouncementUnsub){firebaseAnnouncementUnsub();firebaseAnnouncementUnsub=null}if(firebaseMeUnsub){firebaseMeUnsub();firebaseMeUnsub=null}clearFirebaseNotificationListeners();clearToken();socket?.disconnect();socket=null;currentUser=null;selectedUserId=null;selectedGroupId=null;document.getElementById('app').classList.remove('visible');document.getElementById('auth-screen').style.display='flex'}
+async function doLogout(){
+  closeSlideMenu();
+  if(FIREBASE_AUTH_MODE){
+    try{
+      const fb=window.xygoFirebase;
+      if(fb?.auth?.currentUser){
+        await fb.update(fb.ref(fb.db,`users/${fb.auth.currentUser.uid}`),{online:false,last_seen:Date.now()});
+        await fb.signOut(fb.auth);
+      }
+    }catch(_){}
+  }else{
+    try{await apiFetch('/api/logout',{method:'POST'})}catch(_){}
+  }
+  cleanupCallState(true);
+  if(firebaseIncomingCallUnsub){firebaseIncomingCallUnsub();firebaseIncomingCallUnsub=null}
+  if(firebaseUsersUnsub){firebaseUsersUnsub();firebaseUsersUnsub=null}
+  if(firebaseMessagesUnsub){firebaseMessagesUnsub();firebaseMessagesUnsub=null}
+  if(firebaseGroupMessagesUnsub){firebaseGroupMessagesUnsub();firebaseGroupMessagesUnsub=null}
+  if(firebaseAnnouncementUnsub){firebaseAnnouncementUnsub();firebaseAnnouncementUnsub=null}
+  if(firebaseMeUnsub){firebaseMeUnsub();firebaseMeUnsub=null}
+  clearFirebaseNotificationListeners();
+  clearToken();
+  socket?.disconnect();
+  socket=null;
+  currentUser=null;
+  selectedUserId=null;
+  selectedGroupId=null;
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('auth-screen').style.display='flex';
+}
 function initFirebaseRealtime(){
   const fb=window.xygoFirebase;
   if(!fb||!currentUser)return;
   if(firebaseAnnouncementUnsub){firebaseAnnouncementUnsub();firebaseAnnouncementUnsub=null}
   if(firebaseMeUnsub){firebaseMeUnsub();firebaseMeUnsub=null}
+  if(firebaseIncomingCallUnsub){firebaseIncomingCallUnsub();firebaseIncomingCallUnsub=null}
   firebaseAnnouncementUnsub=fb.onChildAdded(fb.query(fb.ref(fb.db,'announcements'),fb.limitToLast(1)),(snap)=>{
     const a=snap.val();if(!a)return;
     const b=document.getElementById('announce-banner');
@@ -1383,6 +1442,14 @@ function initFirebaseRealtime(){
     currentUser.display_name=me.display_name||currentUser.display_name;
     updateSlideMenu();
     updateMyProfileBtn();
+  });
+  firebaseIncomingCallUnsub=fb.onChildAdded(fb.query(fb.ref(fb.db,'calls'),fb.orderByChild('callee_id'),fb.equalTo(currentUser.id),fb.limitToLast(3)),(snap)=>{
+    const call=snap.val()||{};
+    if(!snap.key||call.caller_id===currentUser.id)return;
+    if(call.status!=='ringing')return;
+    if(callState!=='idle')return;
+    callIncomingData={id:snap.key,...call};
+    showIncomingCallModal(callIncomingData);
   });
 }
 function enterApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('app').classList.add('visible');updateSlideMenu();if(FIREBASE_AUTH_MODE){initFirebaseRealtime();loadUsers();loadGroups();if(!selectedGroupId){setTimeout(()=>openGroupChat('general'),150)}}else{initSocket();loadUsers()}checkIOSInstall();updateMyProfileBtn();setTimeout(setupPushNotifications,3000);}
@@ -1584,7 +1651,7 @@ async function loadGroups(){
   }catch(_){}
 }
 function showChatEmptyState(){document.getElementById('chat-empty').style.display='flex';document.getElementById('chat-active').style.display='none';document.getElementById('group-chat-active').style.display='none'}
-function goBackToList(){document.getElementById('sidebar').classList.remove('hidden-mobile');document.getElementById('chat-zone').classList.remove('visible-mobile');selectedUserId=null;selectedGroupId=null;closeContextMenu();closeChatDotsMenu()}
+function goBackToList(){document.getElementById('sidebar').classList.remove('hidden-mobile');document.getElementById('chat-zone').classList.remove('visible-mobile');selectedUserId=null;selectedGroupId=null;closeContextMenu();closeChatDotsMenu();updateCallButtonState()}
 
 // ══ DM CHAT ══
 async function openChat(userId){
@@ -1596,6 +1663,7 @@ async function openChat(userId){
   document.getElementById('typing-indicator').classList.remove('show');
   const pb=document.getElementById('cdm-pin-label');if(pb)pb.textContent=user.pinned?'Désépingler':'Épingler';
   const pi=document.getElementById('cdm-pin-icon');if(pi)pi.textContent=user.pinned?'📌✓':'📌';
+  updateCallButtonState();
   if(isMobile()){document.getElementById('sidebar').classList.add('hidden-mobile');document.getElementById('chat-zone').classList.add('visible-mobile')}
   setTimeout(()=>document.getElementById('chat-input').focus(),300);
   if(!FIREBASE_AUTH_MODE)socket?.emit('messages:read',{senderId:userId});
@@ -1611,6 +1679,7 @@ function updateChatHeader(){
   document.getElementById('chat-name').innerHTML=nh;
   const s=document.getElementById('chat-status');
   if(u.online){s.textContent='● en ligne';s.style.color='var(--accent)'}else{const ago=u.last_seen?timeAgo(new Date(u.last_seen)):'';s.textContent=ago?`○ vu ${ago}`:'○ hors ligne';s.style.color='var(--muted)'}
+  updateCallButtonState();
 }
 function toggleChatDotsMenu(){document.getElementById('chat-dots-menu').classList.toggle('open');setTimeout(()=>document.addEventListener('click',closeChatDotsMenu,{once:true}),50)}
 function closeChatDotsMenu(){document.getElementById('chat-dots-menu')?.classList.remove('open')}
@@ -1908,7 +1977,7 @@ function closePublicProfile(){document.getElementById('public-profile-modal').cl
 function showCreateGroupModal(){closeMini();document.getElementById('mini-title').textContent='👥 Créer un groupe';document.getElementById('mini-desc').innerHTML=`<input class="mini-input" id="new-group-name" placeholder="Nom du groupe…" maxlength="40" style="display:block;margin-bottom:8px"/><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">Membres :</div><div id="gcm-cb" style="max-height:200px;overflow-y:auto;margin-bottom:8px">${allUsers.map(u=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;font-size:12px"><input type="checkbox" value="${u.id}" style="accent-color:var(--accent)"/> ${esc(u.display_name)}</label>`).join('')}</div>`;document.getElementById('mini-input').style.display='none';const c=document.getElementById('mini-confirm');c.textContent='👥 Créer';c.className='btn-action btn-success';c.style.display='';c.onclick=createGroup;document.getElementById('mini-modal').classList.add('open')}
 async function createGroup(){const name=document.getElementById('new-group-name')?.value?.trim();if(!name)return showToast('Nom requis','warn');const members=Array.from(document.querySelectorAll('#gcm-cb input:checked')).map(cb=>String(cb.value));const r=await apiFetch('/api/groups',{method:'POST',body:JSON.stringify({name,members})});if(r.ok){const d=await r.json();showToast('👥 Groupe créé !');closeMini();loadGroups();openGroupChat(String(d.groupId||d.id||d.group_uid||''))}else{const d=await r.json();showToast(d.error,'danger')}}
 async function leaveGroup(gid){await apiFetch(`/api/groups/${gid}/leave`,{method:'POST'});showToast('Groupe quitté');loadGroups();if(selectedGroupId===gid){selectedGroupId=null;showChatEmptyState()}}
-async function openGroupChat(groupId){selectedGroupId=String(groupId);selectedUserId=null;await loadGroups();const g=allGroups.find(x=>String(x.id)===String(groupId));if(!g)return showToast('Introuvable','danger');document.getElementById('chat-empty').style.display='none';document.getElementById('chat-active').style.display='none';const ga=document.getElementById('group-chat-active');ga.style.cssText='display:flex;flex-direction:column;flex:1;overflow:hidden';document.getElementById('group-chat-icon').textContent=g.is_public?'🌐':'👥';document.getElementById('group-chat-name').textContent=g.name;document.getElementById('group-chat-members-count').textContent=`${g.member_count} membres`;document.getElementById('group-typing-indicator').classList.remove('show');renderSidebarContent();await loadGroupMessages(String(g.id));cancelGroupReply();if(isMobile()){document.getElementById('sidebar').classList.add('hidden-mobile');document.getElementById('chat-zone').classList.add('visible-mobile')}setTimeout(()=>document.getElementById('group-chat-input').focus(),300)}
+async function openGroupChat(groupId){selectedGroupId=String(groupId);selectedUserId=null;await loadGroups();const g=allGroups.find(x=>String(x.id)===String(groupId));if(!g)return showToast('Introuvable','danger');document.getElementById('chat-empty').style.display='none';document.getElementById('chat-active').style.display='none';const ga=document.getElementById('group-chat-active');ga.style.cssText='display:flex;flex-direction:column;flex:1;overflow:hidden';document.getElementById('group-chat-icon').textContent=g.is_public?'🌐':'👥';document.getElementById('group-chat-name').textContent=g.name;document.getElementById('group-chat-members-count').textContent=`${g.member_count} membres`;document.getElementById('group-typing-indicator').classList.remove('show');renderSidebarContent();updateCallButtonState();await loadGroupMessages(String(g.id));cancelGroupReply();if(isMobile()){document.getElementById('sidebar').classList.add('hidden-mobile');document.getElementById('chat-zone').classList.add('visible-mobile')}setTimeout(()=>document.getElementById('group-chat-input').focus(),300)}
 async function loadGroupMessages(groupId){if(FIREBASE_AUTH_MODE){const fb=window.xygoFirebase;if(!fb)return;const area=document.getElementById('group-messages-area');area.innerHTML='<div style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);margin:auto">Début du groupe 👥</div>';if(firebaseGroupMessagesUnsub){firebaseGroupMessagesUnsub();firebaseGroupMessagesUnsub=null}firebaseGroupMessagesUnsub=fb.onChildAdded(fb.query(fb.ref(fb.db,`groupMessages/${groupId}`),fb.limitToLast(200)),(snap)=>{const ph=area.querySelector('[style*="margin:auto"]');if(ph)ph.remove();appendGroupMessage({id:snap.key,...(snap.val()||{})},false);scrollGroupToBottom()});return}const r=await apiFetch(`/api/groups/${groupId}/messages`);if(!r.ok)return;const msgs=await r.json();const area=document.getElementById('group-messages-area');area.innerHTML='';if(!msgs.length){area.innerHTML='<div style="text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);margin:auto">Début du groupe 👥</div>';return}let lastDay=null;msgs.forEach(m=>{const day=m.created_at.split(' ')[0];if(day!==lastDay){area.insertAdjacentHTML('beforeend',`<div class="day-sep"><span>${formatDay(day)}</span></div>`);lastDay=day}appendGroupMessage(m,false)});scrollGroupToBottom()}
 function appendGroupMessage(msg,animate=true){const area=document.getElementById('group-messages-area');const isMine=msg.sender_id===currentUser.id;const time=fmtTime(msg.created_at);const ph=area.querySelector('[style*="margin:auto"]');if(ph)ph.remove();const ch=msg.deleted?'[Message supprimé]':sanitizeContent(msg.content);const eb=msg.edited&&!msg.deleted?'<span class="msg-edited">modifié</span>':'';const rh=msg.reply_to&&msg.reply_sender_name&&!msg.deleted?`<div class="reply-preview"><div class="reply-preview-name">${esc(msg.reply_sender_name)}</div><div class="reply-preview-text">${esc((msg.reply_content||'[supprimé]').substring(0,80))}</div></div>`:'';const sl=!isMine&&!msg.deleted?`<div style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-bottom:2px;font-weight:700">${esc(msg.sender_name)}</div>`:'';const row=document.createElement('div');row.className=`msg-row ${isMine?'mine':'theirs'}`;row.dataset.msgId=`g${msg.id}`;row.innerHTML=`<div class="message"><div class="msg-wrap"><div class="msg-bubble${msg.deleted?' msg-deleted':''}">${sl}${rh}${ch}${eb}</div></div><div class="msg-time">${time}</div></div>`;if(!animate){const b=row.querySelector('.msg-bubble');if(b)b.style.animation='none'}let lpT=null;const bubble=row.querySelector('.msg-bubble');if(bubble&&!msg.deleted){bubble.addEventListener('touchstart',()=>{lpT=setTimeout(()=>{setGroupReply(msg.id,isMine?currentUser.display_name:(msg.sender_name||''),msg.content?.substring(0,80)||'')},500)},{passive:true});bubble.addEventListener('touchend',()=>clearTimeout(lpT),{passive:true});bubble.addEventListener('touchmove',()=>clearTimeout(lpT),{passive:true})}area.appendChild(row)}
 async function sendGroupMessage(){const inp=document.getElementById('group-chat-input');const c=inp.value.trim();if(!c||!selectedGroupId)return;if(FIREBASE_AUTH_MODE){const fb=window.xygoFirebase;if(!fb||!currentUser)return;await fb.push(fb.ref(fb.db,`groupMessages/${selectedGroupId}`),{groupId:selectedGroupId,sender_id:currentUser.id,sender_name:currentUser.display_name||'Utilisateur',content:c,reply_to:groupReplyToId||null,created_at:Date.now(),deleted:false,edited:false});try{const r=await apiFetch(`/api/groups/${selectedGroupId}/members`);if(r.ok){const members=await r.json();const targets=(members||[]).map(m=>String(m.uid||m.id||'')).filter(id=>id&&id!==String(currentUser.id));sendPushToUsers(targets,`Groupe ${allGroups.find(g=>String(g.id)===String(selectedGroupId))?.name||'XyGo'}`,c.substring(0,90),{type:'group',id:String(selectedGroupId)});}}catch(_){}inp.value='';autoResize(inp);inp.focus();cancelGroupReply();return}if(!socket)return;socket.emit('group:message',{groupId:selectedGroupId,content:c,replyTo:groupReplyToId});inp.value='';autoResize(inp);inp.focus();cancelGroupReply();socket.emit('group:typing:stop',{groupId:selectedGroupId})}
@@ -1940,6 +2009,175 @@ async function sendGroupImage(input){
 function setGroupReply(msgId,sn,pv){groupReplyToId=msgId;document.getElementById('group-reply-bar-name').textContent='↩ '+sn;document.getElementById('group-reply-bar-text').textContent=pv;document.getElementById('group-reply-bar').style.display='block';document.getElementById('group-chat-input').focus()}
 function cancelGroupReply(){groupReplyToId=null;document.getElementById('group-reply-bar').style.display='none'}
 async function showGroupMembers(){if(!selectedGroupId)return;const r=await apiFetch(`/api/groups/${selectedGroupId}/members`);if(!r.ok)return;const members=await r.json();document.getElementById('mini-title').textContent='👥 Membres';document.getElementById('mini-desc').innerHTML=`<div style="max-height:400px;overflow-y:auto">${members.map(m=>`<div style="display:flex;align-items:center;gap:8px;padding:6px;border-bottom:1px solid var(--border)"><span class="status-dot ${m.online?'on':'off'}"></span><div style="flex:1;font-size:12px;font-weight:700">${esc(m.display_name)}${m.role==='admin'?' 👑':m.role==='moderator'?' 🛡':''}</div><button class="btn-sm" onclick="closeMini();openChat('${String(m.id||m.uid||'')}')" style="font-size:9px;padding:3px 6px">💬</button></div>`).join('')}</div>`;document.getElementById('mini-input').style.display='none';document.getElementById('mini-confirm').style.display='none';document.getElementById('mini-modal').classList.add('open')}
+
+// ══ CALLS (WEBRTC + FIREBASE SIGNALING) ══
+function getCallRoomId(uidA,uidB){return [String(uidA||''),String(uidB||'')].sort().join('__')}
+function setCallStatusLabel(text){const el=document.getElementById('ongoing-call-status');if(el)el.textContent=text||'Appel'}
+function setCallModals(incoming=false,ongoing=false){
+  document.getElementById('incoming-call-modal')?.classList.toggle('open',!!incoming);
+  document.getElementById('ongoing-call-modal')?.classList.toggle('open',!!ongoing);
+}
+function updateCallButtonState(){
+  const btn=document.getElementById('chat-call-btn');
+  if(!btn)return;
+  const enabled=!!selectedUserId&&callState==='idle';
+  btn.disabled=!enabled;
+  btn.style.opacity=enabled?'1':'.45';
+  btn.style.cursor=enabled?'pointer':'not-allowed';
+}
+function showIncomingCallModal(call){
+  const user=allUsers.find((u)=>String(u.id)===String(call.caller_id));
+  const name=user?.display_name||'Utilisateur';
+  document.getElementById('incoming-call-name').textContent=`${name} t'appelle`;
+  document.getElementById('incoming-call-avatar').textContent=(name[0]||'?').toUpperCase();
+  setCallModals(true,false);
+}
+function showOngoingCallModal(name,status='Connexion...'){
+  document.getElementById('ongoing-call-name').textContent=name||'Appel audio';
+  document.getElementById('ongoing-call-avatar').textContent=((name||'?')[0]||'?').toUpperCase();
+  setCallStatusLabel(status);
+  setCallModals(false,true);
+}
+function getCallTargetName(uid){
+  if(String(uid)===String(currentUser?.id))return currentUser?.display_name||'Moi';
+  return allUsers.find((u)=>String(u.id)===String(uid))?.display_name||'Utilisateur';
+}
+function closeCallRoomListeners(){
+  if(callRoomUnsub){callRoomUnsub();callRoomUnsub=null}
+  if(callCandidatesUnsub){callCandidatesUnsub();callCandidatesUnsub=null}
+}
+function cleanupCallState(silent=false){
+  closeCallRoomListeners();
+  if(callPeer){try{callPeer.close()}catch(_){}}
+  if(callLocalStream){callLocalStream.getTracks().forEach((t)=>{try{t.stop()}catch(_){}})}
+  const remoteAudio=document.getElementById('remote-call-audio');
+  if(remoteAudio)remoteAudio.srcObject=null;
+  callPeer=null;
+  callLocalStream=null;
+  callRemoteStream=null;
+  callRoomId=null;
+  callTargetId=null;
+  callDirection='';
+  callState='idle';
+  callIncomingData=null;
+  callMuted=false;
+  const muteBtn=document.getElementById('mute-call-btn');
+  if(muteBtn)muteBtn.textContent='Micro';
+  setCallModals(false,false);
+  updateCallButtonState();
+  if(!silent)showToast('📴 Appel terminé');
+}
+async function createCallPeer(role){
+  const fb=window.xygoFirebase;
+  if(!fb||!currentUser||!callRoomId||!callTargetId)throw new Error('Contexte appel invalide');
+  callPeer=new RTCPeerConnection(CALL_STUN);
+  callRemoteStream=new MediaStream();
+  const remoteAudio=document.getElementById('remote-call-audio');
+  if(remoteAudio)remoteAudio.srcObject=callRemoteStream;
+  callPeer.ontrack=(event)=>{
+    event.streams[0]?.getTracks()?.forEach((track)=>callRemoteStream.addTrack(track));
+    callState='active';
+    setCallStatusLabel('En communication');
+  };
+  callPeer.onicecandidate=(event)=>{
+    if(!event.candidate)return;
+    fb.push(fb.ref(fb.db,`calls/${callRoomId}/candidates/${currentUser.id}`),event.candidate.toJSON()).catch(()=>{});
+  };
+  callCandidatesUnsub=fb.onChildAdded(fb.ref(fb.db,`calls/${callRoomId}/candidates/${callTargetId}`),async(snap)=>{
+    const data=snap.val();
+    if(!data||!callPeer)return;
+    try{await callPeer.addIceCandidate(new RTCIceCandidate(data))}catch(_){}
+  });
+  callRoomUnsub=fb.onValue(fb.ref(fb.db,`calls/${callRoomId}`),async(snap)=>{
+    if(!snap.exists()){cleanupCallState();return}
+    const call=snap.val()||{};
+    if(call.status==='ended'||call.status==='rejected'){
+      if(callState!=='idle'){showToast(call.status==='rejected'?'📵 Appel refusé':'📴 Appel terminé')}
+      cleanupCallState(true);
+      return;
+    }
+    if(role==='caller'&&call.answer&&callPeer.signalingState!=='closed'&&!callPeer.currentRemoteDescription){
+      try{await callPeer.setRemoteDescription(new RTCSessionDescription(call.answer));setCallStatusLabel('En communication')}catch(_){}
+    }
+  });
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+  callLocalStream=stream;
+  stream.getTracks().forEach((track)=>callPeer.addTrack(track,stream));
+}
+async function startVoiceCall(){
+  if(callState!=='idle')return showToast('Un appel est déjà en cours','warn');
+  if(!selectedUserId||!currentUser)return showToast('Choisis un contact','warn');
+  if(!navigator.mediaDevices?.getUserMedia)return showToast('Appel non supporté','danger');
+  const fb=window.xygoFirebase;
+  if(!fb)return;
+  try{
+    callDirection='outgoing';
+    callState='dialing';
+    callTargetId=String(selectedUserId);
+    callRoomId=getCallRoomId(currentUser.id,callTargetId);
+    showOngoingCallModal(getCallTargetName(callTargetId),'Appel en cours...');
+    await createCallPeer('caller');
+    const offer=await callPeer.createOffer();
+    await callPeer.setLocalDescription(offer);
+    await fb.set(fb.ref(fb.db,`calls/${callRoomId}`),{
+      caller_id:currentUser.id,
+      callee_id:callTargetId,
+      status:'ringing',
+      created_at:Date.now(),
+      offer:offer.toJSON()
+    });
+    updateCallButtonState();
+  }catch(_){
+    cleanupCallState(true);
+    showToast("Impossible de lancer l'appel",'danger');
+  }
+}
+async function acceptIncomingCall(){
+  if(!callIncomingData||callState!=='idle')return;
+  if(!navigator.mediaDevices?.getUserMedia)return showToast('Appel non supporté','danger');
+  const fb=window.xygoFirebase;
+  if(!fb)return;
+  try{
+    callDirection='incoming';
+    callState='connecting';
+    callRoomId=String(callIncomingData.id);
+    callTargetId=String(callIncomingData.caller_id);
+    showOngoingCallModal(getCallTargetName(callTargetId),'Connexion...');
+    await createCallPeer('callee');
+    if(callIncomingData.offer)await callPeer.setRemoteDescription(new RTCSessionDescription(callIncomingData.offer));
+    const answer=await callPeer.createAnswer();
+    await callPeer.setLocalDescription(answer);
+    await fb.update(fb.ref(fb.db,`calls/${callRoomId}`),{answer:answer.toJSON(),status:'active',accepted_at:Date.now()});
+    updateCallButtonState();
+  }catch(_){
+    cleanupCallState(true);
+    showToast("Impossible d'accepter l'appel",'danger');
+  }
+}
+async function rejectIncomingCall(){
+  if(!callIncomingData)return;
+  const fb=window.xygoFirebase;
+  try{
+    if(fb)await fb.update(fb.ref(fb.db,`calls/${callIncomingData.id}`),{status:'rejected',ended_at:Date.now()});
+  }catch(_){}
+  callIncomingData=null;
+  setCallModals(false,false);
+}
+async function hangupCall(){
+  if(callState==='idle'){cleanupCallState(true);return}
+  const fb=window.xygoFirebase;
+  try{
+    if(fb&&callRoomId)await fb.update(fb.ref(fb.db,`calls/${callRoomId}`),{status:'ended',ended_at:Date.now()});
+  }catch(_){}
+  cleanupCallState(true);
+}
+function toggleMuteCall(){
+  if(!callLocalStream)return;
+  callMuted=!callMuted;
+  callLocalStream.getAudioTracks().forEach((track)=>{track.enabled=!callMuted});
+  const btn=document.getElementById('mute-call-btn');
+  if(btn)btn.textContent=callMuted?'Micro off':'Micro';
+}
 
 // ══ NOTIFICATIONS ══
 let notifTimer=null,notifTarget=null;
